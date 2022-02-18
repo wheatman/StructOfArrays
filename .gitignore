@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+perf.data
+perf.data.old
+basic
