@@ -50,7 +50,7 @@ CFLAGS += -Rpass=.* -Rpass-missed=.* -Rpass-analysis=.*
 endif
 
 
-all: basic test profile opt 
+all: basic
  
 basic: main.cpp soa.hpp aos.hpp
 	$(CXX) $(CFLAGS) $(DEFINES) $(LDFLAGS) -o $@ main.cpp
@@ -58,5 +58,5 @@ basic: main.cpp soa.hpp aos.hpp
 
 
 clean:
-	rm -f *.o opt profile basic code.profdata default.profraw
+	rm -f *.o opt profile basic code.profdata default.profraw cachegrind.out.* perf.data.*
 

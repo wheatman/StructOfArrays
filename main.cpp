@@ -31,8 +31,9 @@ int main(int32_t argc, char *argv[]) {
 
     tup.get<0>(7) = std::make_tuple(99);
     tup.get<0, 3>(8) = std::make_tuple(101, 202);
-    tup.get<0, 1, 2, 3>(9) = std::make_tuple(5, 4, false, 100);
-    tup.print_soa<0, 1, 2, 3>();
+    tup.get(9) = std::make_tuple(5, 4, false, 100);
+    tup.print_soa();
+    tup.print_aos<0, 1, 2, 3>();
     std::cout << "\n";
 
     size_t sum_all = 0;
@@ -40,7 +41,20 @@ int main(int32_t argc, char *argv[]) {
     std::cout << sum_all << "\n";
 
     tup.map_range<0>([](auto &x) { x += 1; });
-    tup.print_soa<0, 1, 2, 3>();
+    tup.print_soa();
+
+    auto tup2 = tup.resize(9);
+    tup2.print_soa();
+
+    auto tup3 = tup2.resize(20);
+    tup3.print_soa();
+    std::cout << "\n";
+    tup3.print_soa<0, 3>();
+    std::cout << "\n";
+
+    auto tup4 = tup2.pull_types<0, 2>();
+    tup4.print_type_details();
+    tup4.print_soa();
   }
 
   if (argc > 1) {
@@ -56,7 +70,7 @@ int main(int32_t argc, char *argv[]) {
     //   tup.set(i, {dis_int(g), dis_int(g), dis_int(g), dis_int(g)});
     // }
     for (uint64_t i = 0; i < number_of_elements; i++) {
-      tup.get<0, 1, 2, 3>(i) = std::make_tuple(i, 2 * i, 3 * i, 4 * i);
+      tup.get(i) = std::make_tuple(i, 2 * i, 3 * i, 4 * i);
     }
     uint64_t start = 0;
     uint64_t end = 0;
@@ -65,28 +79,28 @@ int main(int32_t argc, char *argv[]) {
     size_t sum_first = 0;
     tup.map_range<0>([&sum_first](auto x) { sum_first += x; });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "First time was " << end - start << "  sum was ";
     std::cout << sum_first << "\n";
 
     start = get_time();
     size_t sum_second = 0;
     tup.map_range<1>([&sum_second](auto x) { sum_second += x; });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "Second time was " << end - start << "  sum was ";
     std::cout << sum_second << "\n";
 
     start = get_time();
     size_t sum_third = 0;
     tup.map_range<2>([&sum_third](auto x) { sum_third += x; });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "Third time was " << end - start << "  sum was ";
     std::cout << sum_third << "\n";
 
     start = get_time();
     size_t sum_forth = 0;
     tup.map_range<3>([&sum_forth](auto x) { sum_forth += x; });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "Forth time was " << end - start << "  sum was ";
     std::cout << sum_forth << "\n";
 
     start = get_time();
@@ -94,7 +108,7 @@ int main(int32_t argc, char *argv[]) {
     tup.map_range<0, 1>(
         [&sum_first_2](auto x, auto y) { sum_first_2 += x + y; });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "First 2 time was " << end - start << "  sum was ";
     std::cout << sum_first_2 << "\n";
 
     start = get_time();
@@ -102,16 +116,16 @@ int main(int32_t argc, char *argv[]) {
     tup.map_range<2, 3>(
         [&sum_second_2](auto x, auto y) { sum_second_2 += x + y; });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "Second 2 time was " << end - start << "  sum was ";
     std::cout << sum_second_2 << "\n";
 
     start = get_time();
     size_t sum_all = 0;
-    tup.map_range<0, 1, 2, 3>([&sum_all](auto w, auto x, auto y, auto z) {
+    tup.map_range([&sum_all](auto w, auto x, auto y, auto z) {
       sum_all += w + x + y + z;
     });
     end = get_time();
-    std::cout << "time was " << end - start << "  sum was ";
+    std::cout << "All time was " << end - start << "  sum was ";
     std::cout << sum_all << "\n";
   }
 

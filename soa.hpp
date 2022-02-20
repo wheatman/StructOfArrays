@@ -7,79 +7,24 @@
 #include <limits>
 #include <tuple>
 #include <utility>
-
-namespace {
-
-template <size_t I, typename... Ts>
-constexpr void get_alignment_impl(std::array<std::size_t, sizeof...(Ts)> &arr) {
-  if constexpr (I == sizeof...(Ts)) {
-    return;
-  } else {
-    arr[I] = std::alignment_of_v<std::tuple_element_t<I, std::tuple<Ts...>>>;
-    get_alignment_impl<I + 1, Ts...>(arr);
-  }
-}
-
-template <size_t I, typename... Ts>
-constexpr void get_size_impl(std::array<std::size_t, sizeof...(Ts)> &arr) {
-  if constexpr (I == sizeof...(Ts)) {
-    return;
-  } else {
-    arr[I] = sizeof(std::tuple_element_t<I, std::tuple<Ts...>>);
-    get_size_impl<I + 1, Ts...>(arr);
-  }
-}
-
-template <typename... Ts> constexpr auto get_alignment() {
-  std::array<std::size_t, sizeof...(Ts)> arr = {};
-  get_alignment_impl<0, Ts...>(arr);
-  return arr;
-}
-template <typename... Ts> constexpr auto get_size() {
-  std::array<std::size_t, sizeof...(Ts)> arr = {};
-  get_size_impl<0, Ts...>(arr);
-  return arr;
-}
-
-// helper function to print a tuple of any size
-template <class Tuple, std::size_t N> struct TuplePrinter {
-  static void print(const Tuple &t) {
-    TuplePrinter<Tuple, N - 1>::print(t);
-    std::cout << ", " << std::get<N - 1>(t);
-  }
-};
-
-template <class Tuple> struct TuplePrinter<Tuple, 1> {
-  static void print(const Tuple &t) { std::cout << std::get<0>(t); }
-};
-
-template <typename... Args, std::enable_if_t<sizeof...(Args) == 0, int> = 0>
-void printTuple([[maybe_unused]] const std::tuple<Args...> &t) {
-  std::cout << "()\n";
-}
-
-template <typename... Args, std::enable_if_t<sizeof...(Args) != 0, int> = 0>
-void printTuple(const std::tuple<Args...> &t) {
-  std::cout << "(";
-  TuplePrinter<decltype(t), sizeof...(Args)>::print(t);
-  std::cout << ")\n";
-}
-
-} // namespace
+#include <vector>
 
 template <typename... Ts> class SOA {
   using T = std::tuple<Ts...>;
   static constexpr std::size_t num_types = sizeof...(Ts);
-  static constexpr std::array<std::size_t, num_types> alignments =
-      get_alignment<Ts...>();
-  static constexpr std::array<std::size_t, num_types> sizes = get_size<Ts...>();
+  static constexpr std::array<std::size_t, num_types> alignments = {
+      std::alignment_of_v<Ts>...};
+
+  template <int I> using NthType = typename std::tuple_element<I, T>::type;
+
+  static constexpr std::array<std::size_t, num_types> sizes = {sizeof(Ts)...};
+
   static constexpr size_t total_alignment = 64;
 
   size_t num_spots;
   void *base_array;
 
-  template <size_t I>
-  std::tuple_element_t<I, T> *get_starting_pointer_to_type() {
+  template <size_t I> NthType<I> *get_starting_pointer_to_type() {
     static_assert(I < num_types);
     uintptr_t offset = 0;
     for (size_t i = 0; i < I; i++) {
@@ -88,7 +33,43 @@ template <typename... Ts> class SOA {
         offset += alignments[i + 1] - (offset % alignments[i + 1]);
       }
     }
-    return (std::tuple_element_t<I, T> *)((char *)base_array + offset);
+    return (NthType<I> *)((char *)base_array + offset);
+  }
+
+  template <std::size_t... Is>
+  SOA resize_impl(
+      size_t n, [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    SOA soa(n);
+    size_t end = std::min(num_spots, soa.num_spots);
+    for (size_t i = 0; i < end; i++) {
+      soa.get<Is...>(i) = get<Is...>(i);
+    }
+    const T zero;
+    for (size_t i = end; i < soa.num_spots; i++) {
+      soa.get<Is...>(i) = zero;
+    }
+
+    return soa;
+  }
+
+  template <size_t I> bool print_field() {
+    for (size_t i = 0; i < num_spots; i++) {
+      std::cout << std::get<0>(get<I>(i)) << ", ";
+    }
+    std::cout << "\n";
+    return true;
+  }
+  template <size_t... Is>
+  void print_soa_impl(
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    auto x = {print_field<Is>()...};
+    (void)x;
+  }
+
+  template <size_t... Is>
+  auto get_impl(size_t i,
+                [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    return std::forward_as_tuple(get_starting_pointer_to_type<Is>()[i]...);
   }
 
 public:
@@ -124,7 +105,11 @@ public:
   void zero() { std::memset(base_array, 0, get_size()); }
 
   template <size_t... Is> auto get(size_t i) {
-    return std::forward_as_tuple(get_starting_pointer_to_type<Is>()[i]...);
+    if constexpr (sizeof...(Is) > 0) {
+      return get_impl<Is...>(i, {});
+    } else {
+      return get_impl(i, std::make_index_sequence<num_types>{});
+    }
   }
 
   static void print_type_details() {
@@ -140,25 +125,47 @@ public:
     }
     std::cout << "\n";
   }
-  template <size_t I, size_t... rest> void print_soa() {
-    for (size_t i = 0; i < num_spots; i++) {
-      std::cout << std::get<0>(get<I>(i)) << ", ";
-    }
-    std::cout << "\n";
-    if constexpr (sizeof...(rest) > 0) {
-      print_soa<rest...>();
+  template <size_t... Is> void print_soa() {
+    if constexpr (sizeof...(Is) > 0) {
+      print_soa_impl<Is...>({});
+    } else {
+      print_soa_impl(std::make_index_sequence<num_types>{});
     }
   }
 
-  template <size_t... Is> void print_aos() {
-    for (size_t i = 0; i < num_spots; i++) {
-      printTuple(get<Is...>(i));
+  template <size_t... Is, class F>
+  void map_range(F f, size_t start = 0,
+                 size_t end = std::numeric_limits<size_t>::max()) {
+    if (end == std::numeric_limits<size_t>::max()) {
+      end = num_spots;
     }
-  }
-
-  template <size_t... Is, class F> void map_range(F f) {
-    for (size_t i = 0; i < num_spots; i++) {
+    for (size_t i = start; i < end; i++) {
       std::apply(f, get<Is...>(i));
     }
+  }
+  template <size_t... Is, class F>
+  void map_range_with_index(F f, size_t start = 0,
+                            size_t end = std::numeric_limits<size_t>::max()) {
+    if (end == std::numeric_limits<size_t>::max()) {
+      end = num_spots;
+    }
+    for (size_t i = start; i < end; i++) {
+      std::apply(f, std::tuple_cat(std::make_tuple(i), get<Is...>(i)));
+    }
+  }
+  template <size_t... Is> void print_aos() {
+    map_range<Is...>(
+        [](auto... args) { ((std::cout << args << ","), ...) << "\n"; });
+  }
+
+  SOA resize(size_t n) {
+    return resize_impl(n, std::make_index_sequence<num_types>{});
+  }
+  template <size_t... Is> SOA<NthType<Is>...> pull_types() {
+    SOA<NthType<Is>...> soa(num_spots);
+    for (size_t i = 0; i < num_spots; i++) {
+      soa.get(i) = get<Is...>(i);
+    }
+    return soa;
   }
 };
