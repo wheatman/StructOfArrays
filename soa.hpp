@@ -9,10 +9,6 @@
 #include <utility>
 
 namespace {
-template <typename T> concept TupleLike = requires(T a) {
-  std::tuple_size<T>::value;
-  std::get<0>(a);
-};
 
 template <size_t I, typename... Ts>
 constexpr void get_alignment_impl(std::array<std::size_t, sizeof...(Ts)> &arr) {
@@ -58,7 +54,7 @@ template <class Tuple> struct TuplePrinter<Tuple, 1> {
 };
 
 template <typename... Args, std::enable_if_t<sizeof...(Args) == 0, int> = 0>
-void printTuple(const std::tuple<Args...> &t) {
+void printTuple([[maybe_unused]] const std::tuple<Args...> &t) {
   std::cout << "()\n";
 }
 
@@ -77,6 +73,7 @@ template <typename... Ts> class SOA {
   static constexpr std::array<std::size_t, num_types> alignments =
       get_alignment<Ts...>();
   static constexpr std::array<std::size_t, num_types> sizes = get_size<Ts...>();
+  static constexpr size_t total_alignment = 64;
 
   size_t num_spots;
   void *base_array;
@@ -95,37 +92,6 @@ template <typename... Ts> class SOA {
   }
 
 public:
-  void zero() {
-    uintptr_t length = 0;
-    for (size_t i = 0; i < num_types; i++) {
-      length += length * sizes[i];
-      if (i < num_types - 1) {
-        // get aligned for the next type
-        if (length % alignments[i + 1] != 0) {
-          length += alignments[i + 1] - (length % alignments[i + 1]);
-        }
-      }
-    }
-    std::memset(base_array, 0, length);
-  }
-  SOA(size_t n) : num_spots(n) {
-    // set the total array to be 64 byte alignmed
-    constexpr size_t total_alignment = 64;
-    uintptr_t length_to_allocate = 0;
-    for (size_t i = 0; i < num_types; i++) {
-      length_to_allocate += num_spots * sizes[i];
-      if (i < num_types - 1) {
-        // get aligned for the next type
-        if (length_to_allocate % alignments[i + 1] != 0) {
-          length_to_allocate +=
-              alignments[i + 1] - (length_to_allocate % alignments[i + 1]);
-        }
-      }
-    }
-    base_array = static_cast<void *>(
-        std::aligned_alloc(total_alignment, length_to_allocate));
-    std::cout << "allocated size " << length_to_allocate << "\n";
-  }
   size_t get_size() {
     uintptr_t length_to_allocate = 0;
     for (size_t i = 0; i < num_types; i++) {
@@ -138,8 +104,24 @@ public:
         }
       }
     }
+    if (length_to_allocate % total_alignment != 0) {
+      length_to_allocate +=
+          total_alignment - (length_to_allocate % total_alignment);
+    }
     return length_to_allocate;
   }
+  SOA(size_t n) : num_spots(n) {
+    // set the total array to be 64 byte alignmed
+
+    uintptr_t length_to_allocate = get_size();
+    base_array = static_cast<void *>(
+        std::aligned_alloc(total_alignment, length_to_allocate));
+    std::cout << "allocated size " << length_to_allocate << "\n";
+  }
+
+  ~SOA() { free(base_array); }
+
+  void zero() { std::memset(base_array, 0, get_size()); }
 
   template <size_t... Is> auto get(size_t i) {
     return std::forward_as_tuple(get_starting_pointer_to_type<Is>()[i]...);
