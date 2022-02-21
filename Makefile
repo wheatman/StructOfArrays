@@ -44,9 +44,9 @@ endif
 
 
 ifeq ($(INFO), 1) 
-# CFLAGS +=  -Rpass-missed="(inline|loop*)" 
-#CFLAGS += -Rpass="(inline|loop*)" -Rpass-missed="(inline|loop*)" -Rpass-analysis="(inline|loop*)" 
-CFLAGS += -Rpass=.* -Rpass-missed=.* -Rpass-analysis=.* 
+CFLAGS +=  -Rpass-missed="(inline|loop*)" -Rpass-analysis="(inline|loop*)" 
+# CFLAGS += -Rpass="(inline|loop*)" -Rpass-missed="(inline|loop*)" -Rpass-analysis="(inline|loop*)" 
+# CFLAGS += -Rpass=.* -Rpass-missed=.* -Rpass-analysis=.* 
 endif
 
 
@@ -58,5 +58,5 @@ basic: main.cpp soa.hpp aos.hpp
 
 
 clean:
-	rm -f *.o opt profile basic code.profdata default.profraw cachegrind.out.* perf.data.*
+	rm -f *.o opt profile basic code.profdata default.profraw cachegrind.out.* perf.data perf.data.old
 

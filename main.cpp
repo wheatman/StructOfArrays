@@ -1,6 +1,7 @@
 #include "aos.hpp"
 #include "soa.hpp"
 
+#include <cstdint>
 #include <limits>
 #include <random>
 #include <sys/time.h>
@@ -12,6 +13,34 @@ static inline uint64_t get_time() {
   return st.tv_sec * 1000000 + st.tv_usec;
 }
 
+using value_and_flag = struct value_and_flag {
+  uint64_t value : 63;
+  bool flag : 1;
+};
+
+std::ostream &operator<<(std::ostream &os, const value_and_flag &vf) {
+  os << "{ " << vf.value << ", " << vf.flag << " } ";
+  return os;
+}
+
+template <size_t I> class __attribute__((__packed__)) sized_int {
+  static_assert(I <= 8);
+  std::array<uint8_t, I> data;
+
+public:
+  sized_int(uint64_t e) { std::memcpy(data.data(), &e, I); }
+  uint64_t get() const {
+    uint64_t x = 0;
+    std::memcpy(&x, data.data(), I);
+    return x;
+  }
+};
+template <size_t I>
+std::ostream &operator<<(std::ostream &os, const sized_int<I> &e) {
+  os << e.get();
+  return os;
+}
+
 int main(int32_t argc, char *argv[]) {
   {
     SOA<int>::print_type_details();
@@ -19,6 +48,9 @@ int main(int32_t argc, char *argv[]) {
     SOA<int, bool, short>::print_type_details();
     SOA<int, short, bool, long>::print_type_details();
     SOA<int, short, bool, char[3]>::print_type_details();
+    SOA<int, short, bool, value_and_flag>::print_type_details();
+    SOA<sized_int<3>, sized_int<5>, sized_int<6>,
+        sized_int<7>>::print_type_details();
   }
   {
     size_t length = 10;
@@ -34,13 +66,17 @@ int main(int32_t argc, char *argv[]) {
     tup.get(9) = std::make_tuple(5, 4, false, 100);
     tup.print_soa();
     tup.print_aos<0, 1, 2, 3>();
+    tup.print_aos_with_index<0, 1, 2, 3>();
     std::cout << "\n";
 
     size_t sum_all = 0;
     tup.map_range<0, 3>([&sum_all](auto x, auto y) { sum_all += x + y; });
     std::cout << sum_all << "\n";
 
-    tup.map_range<0>([](auto &x) { x += 1; });
+    tup.map_range<0, 1>([](auto &x, auto &y) {
+      x += 1;
+      y -= 1;
+    });
     tup.print_soa();
 
     auto tup2 = tup.resize(9);
@@ -55,6 +91,35 @@ int main(int32_t argc, char *argv[]) {
     auto tup4 = tup2.pull_types<0, 2>();
     tup4.print_type_details();
     tup4.print_soa();
+
+    auto tup5 = SOA<value_and_flag, value_and_flag>(5);
+    tup5.print_type_details();
+    value_and_flag vf1 = {100, false};
+    value_and_flag vf2 = {10, true};
+    tup5.get(0) = std::make_tuple(vf1, vf2);
+    tup5.get(1) = std::make_tuple(vf2, vf1);
+    tup5.get(2) = std::make_tuple(vf1, vf2);
+    tup5.get(3) = std::make_tuple(vf2, vf1);
+    tup5.get(4) = std::make_tuple(vf1, vf2);
+    tup5.print_soa();
+    size_t sum_true = 0;
+    tup5.map_range<0>([&sum_true](auto x) {
+      if (x.flag)
+        sum_true += x.value;
+    });
+    std::cout << "sum_true = " << sum_true << "\n";
+
+    auto tup6 = SOA<sized_int<3>, sized_int<5>, sized_int<6>, sized_int<7>>(3);
+    tup6.print_type_details();
+    tup6.get(0) = std::make_tuple(1, 2, 3, 4);
+    tup6.get(1) = std::make_tuple(5, 6, 7, 8);
+    tup6.get(2) = std::make_tuple(9, 10, 11, 12);
+    tup6.print_soa();
+    sum_all = 0;
+    tup6.map_range<0, 1, 2, 3>([&sum_all](auto w, auto x, auto y, auto z) {
+      sum_all += w.get() + x.get() + y.get() + z.get();
+    });
+    std::cout << "sum_all = " << sum_all << "\n";
   }
 
   if (argc > 1) {

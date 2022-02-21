@@ -24,7 +24,7 @@ template <typename... Ts> class SOA {
   size_t num_spots;
   void *base_array;
 
-  template <size_t I> NthType<I> *get_starting_pointer_to_type() {
+  template <size_t I> NthType<I> *get_starting_pointer_to_type() const {
     static_assert(I < num_types);
     uintptr_t offset = 0;
     for (size_t i = 0; i < I; i++) {
@@ -38,7 +38,8 @@ template <typename... Ts> class SOA {
 
   template <std::size_t... Is>
   SOA resize_impl(
-      size_t n, [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+      size_t n,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
     SOA soa(n);
     size_t end = std::min(num_spots, soa.num_spots);
     for (size_t i = 0; i < end; i++) {
@@ -52,7 +53,7 @@ template <typename... Ts> class SOA {
     return soa;
   }
 
-  template <size_t I> bool print_field() {
+  template <size_t I> bool print_field() const {
     for (size_t i = 0; i < num_spots; i++) {
       std::cout << std::get<0>(get<I>(i)) << ", ";
     }
@@ -61,19 +62,20 @@ template <typename... Ts> class SOA {
   }
   template <size_t... Is>
   void print_soa_impl(
-      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
     auto x = {print_field<Is>()...};
     (void)x;
   }
 
   template <size_t... Is>
-  auto get_impl(size_t i,
-                [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+  auto get_impl(
+      size_t i,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
     return std::forward_as_tuple(get_starting_pointer_to_type<Is>()[i]...);
   }
 
 public:
-  size_t get_size() {
+  size_t get_size() const {
     uintptr_t length_to_allocate = 0;
     for (size_t i = 0; i < num_types; i++) {
       length_to_allocate += num_spots * sizes[i];
@@ -102,9 +104,9 @@ public:
 
   ~SOA() { free(base_array); }
 
-  void zero() { std::memset(base_array, 0, get_size()); }
+  void zero() const { std::memset(base_array, 0, get_size()); }
 
-  template <size_t... Is> auto get(size_t i) {
+  template <size_t... Is> auto get(size_t i) const {
     if constexpr (sizeof...(Is) > 0) {
       return get_impl<Is...>(i, {});
     } else {
@@ -125,7 +127,7 @@ public:
     }
     std::cout << "\n";
   }
-  template <size_t... Is> void print_soa() {
+  template <size_t... Is> void print_soa() const {
     if constexpr (sizeof...(Is) > 0) {
       print_soa_impl<Is...>({});
     } else {
@@ -135,7 +137,7 @@ public:
 
   template <size_t... Is, class F>
   void map_range(F f, size_t start = 0,
-                 size_t end = std::numeric_limits<size_t>::max()) {
+                 size_t end = std::numeric_limits<size_t>::max()) const {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
     }
@@ -144,8 +146,9 @@ public:
     }
   }
   template <size_t... Is, class F>
-  void map_range_with_index(F f, size_t start = 0,
-                            size_t end = std::numeric_limits<size_t>::max()) {
+  void
+  map_range_with_index(F f, size_t start = 0,
+                       size_t end = std::numeric_limits<size_t>::max()) const {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
     }
@@ -153,15 +156,18 @@ public:
       std::apply(f, std::tuple_cat(std::make_tuple(i), get<Is...>(i)));
     }
   }
-  template <size_t... Is> void print_aos() {
+  template <size_t... Is> void print_aos() const {
     map_range<Is...>(
         [](auto... args) { ((std::cout << args << ","), ...) << "\n"; });
   }
-
-  SOA resize(size_t n) {
+  template <size_t... Is> void print_aos_with_index() const {
+    map_range_with_index<Is...>(
+        [](auto... args) { ((std::cout << args << ","), ...) << "\n"; });
+  }
+  SOA resize(size_t n) const {
     return resize_impl(n, std::make_index_sequence<num_types>{});
   }
-  template <size_t... Is> SOA<NthType<Is>...> pull_types() {
+  template <size_t... Is> SOA<NthType<Is>...> pull_types() const {
     SOA<NthType<Is>...> soa(num_spots);
     for (size_t i = 0; i < num_spots; i++) {
       soa.get(i) = get<Is...>(i);
