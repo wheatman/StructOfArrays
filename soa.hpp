@@ -24,7 +24,9 @@ template <typename... Ts> class SOA {
   size_t num_spots;
   void *base_array;
 
-  template <size_t I> NthType<I> *get_starting_pointer_to_type() const {
+  template <size_t I>
+  static NthType<I> *get_starting_pointer_to_type_static(void *base_array,
+                                                         size_t num_spots) {
     static_assert(I < num_types);
     uintptr_t offset = 0;
     for (size_t i = 0; i < I; i++) {
@@ -36,46 +38,76 @@ template <typename... Ts> class SOA {
     return (NthType<I> *)((char *)base_array + offset);
   }
 
-  template <std::size_t... Is>
-  SOA resize_impl(
-      size_t n,
-      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
-    SOA soa(n);
-    size_t end = std::min(num_spots, soa.num_spots);
-    for (size_t i = 0; i < end; i++) {
-      soa.get<Is...>(i) = get<Is...>(i);
-    }
-    const T zero;
-    for (size_t i = end; i < soa.num_spots; i++) {
-      soa.get<Is...>(i) = zero;
-    }
-
-    return soa;
+  template <size_t I> NthType<I> *get_starting_pointer_to_type() const {
+    return get_starting_pointer_to_type_static<I>(base_array, num_spots);
   }
 
-  template <size_t I> bool print_field() const {
+  template <std::size_t... Is>
+  static void *resize_impl_static(
+      void *old_base_array, size_t old_num_spots, size_t new_num_spots,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+
+    uintptr_t length_to_allocate = get_size_static(new_num_spots);
+    void *new_base_array = static_cast<void *>(
+        std::aligned_alloc(total_alignment, length_to_allocate));
+
+    size_t end = std::min(old_num_spots, new_num_spots);
+    for (size_t i = 0; i < end; i++) {
+      get_static<Is...>(new_base_array, new_num_spots, i) =
+          get_static<Is...>(old_base_array, old_num_spots, i);
+    }
+    const T zero;
+    for (size_t i = end; i < new_num_spots; i++) {
+      get_static<Is...>(new_base_array, new_num_spots, i) = zero;
+    }
+
+    return new_base_array;
+  }
+
+  template <size_t I>
+  static bool print_field_static(void *base_array, size_t num_spots) {
     for (size_t i = 0; i < num_spots; i++) {
-      std::cout << std::get<0>(get<I>(i)) << ", ";
+      std::cout << std::get<0>(get_static<I>(base_array, num_spots, i)) << ", ";
     }
     std::cout << "\n";
     return true;
   }
+
+  template <size_t I> bool print_field() const {
+    return print_field_static<I>(base_array, num_spots);
+  }
+
+  template <size_t... Is>
+  static void print_soa_impl_static(
+      void *base_array, size_t num_spots,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    auto x = {print_field_static<Is>(base_array, num_spots)...};
+    (void)x;
+  }
+
   template <size_t... Is>
   void print_soa_impl(
       [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
-    auto x = {print_field<Is>()...};
-    (void)x;
+    print_soa_impl_static<Is...>(base_array, num_spots, int_seq);
+  }
+
+  template <size_t... Is>
+  static auto get_impl_static(
+      void *base_array, size_t num_spots, size_t i,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    return std::forward_as_tuple(
+        get_starting_pointer_to_type_static<Is>(base_array, num_spots)[i]...);
   }
 
   template <size_t... Is>
   auto get_impl(
       size_t i,
       [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
-    return std::forward_as_tuple(get_starting_pointer_to_type<Is>()[i]...);
+    return get_impl_static<Is...>(base_array, num_spots, i, int_seq);
   }
 
 public:
-  size_t get_size() const {
+  static size_t get_size_static(size_t num_spots) {
     uintptr_t length_to_allocate = 0;
     for (size_t i = 0; i < num_types; i++) {
       length_to_allocate += num_spots * sizes[i];
@@ -93,25 +125,37 @@ public:
     }
     return length_to_allocate;
   }
+  size_t get_size() const { return get_size_static(num_spots); }
+
   SOA(size_t n) : num_spots(n) {
     // set the total array to be 64 byte alignmed
 
     uintptr_t length_to_allocate = get_size();
     base_array = static_cast<void *>(
         std::aligned_alloc(total_alignment, length_to_allocate));
-    std::cout << "allocated size " << length_to_allocate << "\n";
   }
+
+  SOA(void *array, size_t n) : num_spots(n), base_array(array) {}
 
   ~SOA() { free(base_array); }
 
-  void zero() const { std::memset(base_array, 0, get_size()); }
+  static void zero_static(void *base_array, size_t num_spots) {
+    std::memset(base_array, 0, get_size_static(num_spots));
+  }
+  void zero() const { zero_static(base_array, num_spots); }
+
+  template <size_t... Is>
+  static auto get_static(void *base_array, size_t num_spots, size_t i) {
+    if constexpr (sizeof...(Is) > 0) {
+      return get_impl_static<Is...>(base_array, num_spots, i, {});
+    } else {
+      return get_impl_static(base_array, num_spots, i,
+                             std::make_index_sequence<num_types>{});
+    }
+  }
 
   template <size_t... Is> auto get(size_t i) const {
-    if constexpr (sizeof...(Is) > 0) {
-      return get_impl<Is...>(i, {});
-    } else {
-      return get_impl(i, std::make_index_sequence<num_types>{});
-    }
+    return get_static<Is...>(base_array, num_spots, i);
   }
 
   static void print_type_details() {
@@ -127,51 +171,109 @@ public:
     }
     std::cout << "\n";
   }
-  template <size_t... Is> void print_soa() const {
+
+  template <size_t... Is>
+  static void print_soa_static(void *base_array, size_t num_spots) {
     if constexpr (sizeof...(Is) > 0) {
-      print_soa_impl<Is...>({});
+      print_soa_impl_static<Is...>(base_array, num_spots, {});
     } else {
-      print_soa_impl(std::make_index_sequence<num_types>{});
+      print_soa_impl_static(base_array, num_spots,
+                            std::make_index_sequence<num_types>{});
+    }
+  }
+  template <size_t... Is> void print_soa() const {
+    print_soa_static<Is...>(base_array, num_spots);
+  }
+
+  template <size_t... Is, class F>
+  static void
+  map_range_static(void *base_array, size_t num_spots, F f, size_t start = 0,
+                   size_t end = std::numeric_limits<size_t>::max()) {
+    if (end == std::numeric_limits<size_t>::max()) {
+      end = num_spots;
+    }
+    for (size_t i = start; i < end; i++) {
+      std::apply(f, get_static<Is...>(base_array, num_spots, i));
     }
   }
 
   template <size_t... Is, class F>
   void map_range(F f, size_t start = 0,
                  size_t end = std::numeric_limits<size_t>::max()) const {
+    map_range_static<Is...>(base_array, num_spots, f, start, end);
+  }
+
+  template <size_t... Is, class F>
+  static void
+  map_range_with_index_static(void *base_array, size_t num_spots, F f,
+                              size_t start = 0,
+                              size_t end = std::numeric_limits<size_t>::max()) {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
     }
     for (size_t i = start; i < end; i++) {
-      std::apply(f, get<Is...>(i));
+      std::apply(f,
+                 std::tuple_cat(std::make_tuple(i),
+                                get_static<Is...>(base_array, num_spots, i)));
     }
   }
+
   template <size_t... Is, class F>
   void
   map_range_with_index(F f, size_t start = 0,
                        size_t end = std::numeric_limits<size_t>::max()) const {
-    if (end == std::numeric_limits<size_t>::max()) {
-      end = num_spots;
-    }
-    for (size_t i = start; i < end; i++) {
-      std::apply(f, std::tuple_cat(std::make_tuple(i), get<Is...>(i)));
-    }
+    map_range_with_index_static<Is...>(base_array, num_spots, f, start, end);
   }
+
+  template <size_t... Is>
+  static void print_aos_static(void *base_array, size_t num_spots) {
+    map_range_static<Is...>(base_array, num_spots, [](auto... args) {
+      ((std::cout << args << ","), ...) << "\n";
+    });
+  }
+
   template <size_t... Is> void print_aos() const {
-    map_range<Is...>(
-        [](auto... args) { ((std::cout << args << ","), ...) << "\n"; });
+    print_aos_static(base_array, num_spots);
   }
+
+  template <size_t... Is>
+  static void print_aos_with_index_static(void *base_array, size_t num_spots) {
+    map_range_with_index_static<Is...>(base_array, num_spots, [](auto... args) {
+      ((std::cout << args << ","), ...) << "\n";
+    });
+  }
+
   template <size_t... Is> void print_aos_with_index() const {
-    map_range_with_index<Is...>(
-        [](auto... args) { ((std::cout << args << ","), ...) << "\n"; });
+    print_aos_with_index_static<Is...>(base_array, num_spots);
   }
-  SOA resize(size_t n) const {
-    return resize_impl(n, std::make_index_sequence<num_types>{});
+
+  void *resize_static(void *old_base_array, size_t old_num_spots,
+                      size_t new_num_spots) const {
+    return resize_impl_static(old_base_array, old_num_spots, new_num_spots,
+                              std::make_index_sequence<num_types>{});
+  }
+
+  SOA resize(size_t new_num_spots) const {
+    return SOA(resize_static(base_array, num_spots, new_num_spots),
+               new_num_spots);
+  }
+  template <size_t... Is>
+  static void *pull_types_static(void *base_array, size_t num_spots) {
+
+    uintptr_t length_to_allocate =
+        SOA<NthType<Is>...>::get_size_static(num_spots);
+    void *new_base_array = static_cast<void *>(
+        std::aligned_alloc(total_alignment, length_to_allocate));
+
+    for (size_t i = 0; i < num_spots; i++) {
+      SOA<NthType<Is>...>::get_static(new_base_array, num_spots, i) =
+          get_static<Is...>(base_array, num_spots, i);
+    }
+    return new_base_array;
   }
   template <size_t... Is> SOA<NthType<Is>...> pull_types() const {
-    SOA<NthType<Is>...> soa(num_spots);
-    for (size_t i = 0; i < num_spots; i++) {
-      soa.get(i) = get<Is...>(i);
-    }
+    SOA<NthType<Is>...> soa(pull_types_static<Is...>(base_array, num_spots),
+                            num_spots);
     return soa;
   }
 };
