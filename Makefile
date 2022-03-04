@@ -52,7 +52,7 @@ endif
 
 all: basic
  
-basic: main.cpp soa.hpp aos.hpp
+basic: main.cpp soa.hpp aos.hpp SizedInt.hpp
 	$(CXX) $(CFLAGS) $(DEFINES) $(LDFLAGS) -o $@ main.cpp
 
 

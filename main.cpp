@@ -1,3 +1,4 @@
+#include "SizedInt.hpp"
 #include "aos.hpp"
 #include "soa.hpp"
 
@@ -23,39 +24,6 @@ std::ostream &operator<<(std::ostream &os, const value_and_flag &vf) {
   return os;
 }
 
-template <size_t I> class __attribute__((__packed__)) sized_int {
-  static_assert(I <= 8);
-  std::array<uint8_t, I> data;
-
-public:
-  sized_int(uint64_t e) { std::memcpy(data.data(), &e, I); }
-  uint64_t get() const {
-    uint64_t x = 0;
-    std::memcpy(&x, data.data(), I);
-    return x;
-  }
-};
-template <size_t I>
-std::ostream &operator<<(std::ostream &os, const sized_int<I> &e) {
-  os << e.get();
-  return os;
-}
-
-template <size_t I>
-uint64_t &operator+=(uint64_t &lhs, const sized_int<I> &rhs) {
-  lhs += rhs.get();
-  return lhs;
-}
-
-template <size_t I>
-uint64_t operator+(const uint64_t lhs, const sized_int<I> &rhs) {
-  return lhs + rhs.get();
-}
-template <size_t I, size_t J>
-uint64_t operator+(const sized_int<I> &lhs, const sized_int<J> &rhs) {
-  return lhs.get() + rhs.get();
-}
-
 int main(int32_t argc, char *argv[]) {
   {
     SOA<int>::print_type_details();
@@ -64,8 +32,8 @@ int main(int32_t argc, char *argv[]) {
     SOA<int, short, bool, long>::print_type_details();
     SOA<int, short, bool, char[3]>::print_type_details();
     SOA<int, short, bool, value_and_flag>::print_type_details();
-    SOA<sized_int<3>, sized_int<5>, sized_int<6>,
-        sized_int<7>>::print_type_details();
+    SOA<sized_uint<3>, sized_uint<5>, sized_uint<6>,
+        sized_uint<7>>::print_type_details();
   }
   {
     size_t length = 10;
@@ -125,15 +93,32 @@ int main(int32_t argc, char *argv[]) {
     });
     std::cout << "sum_true = " << sum_true << "\n";
 
-    auto tup6 = SOA<sized_int<3>, sized_int<5>, sized_int<6>, sized_int<7>>(3);
+    auto tup6 =
+        SOA<sized_uint<3>, sized_uint<5>, sized_uint<6>, sized_uint<7>>(4);
     tup6.print_type_details();
     tup6.get(0) = std::make_tuple(1, 2, 3, 4);
     tup6.get(1) = std::make_tuple(5, 6, 7, 8);
     tup6.get(2) = std::make_tuple(9, 10, 11, 12);
+    tup6.get(3) = std::make_tuple(13, 14, 15, 116);
     tup6.print_soa();
     sum_all = 0;
     tup6.map_range([&sum_all](auto... args) { sum_all += (0 + ... + args); });
     std::cout << "sum_all = " << sum_all << "\n";
+
+    for (uint64_t i = 4 - 1; i > 0; i--) {
+      tup6.get(i) = tup6.get(i - 1);
+    }
+    tup6.get(0) = std::tuple<sized_uint<3>, sized_uint<5>, sized_uint<6>,
+                             sized_uint<7>>();
+
+    tup6.print_soa();
+
+    tup6.map_range([](auto &...args) {
+      std::forward_as_tuple(args...) =
+          std::tuple<sized_uint<3>, sized_uint<5>, sized_uint<6>,
+                     sized_uint<7>>();
+    });
+    tup6.print_soa();
   }
   uint64_t flag = 0xFFFFFFFF;
   if (argc > 2) {
@@ -210,10 +195,10 @@ int main(int32_t argc, char *argv[]) {
     std::cout << sum_all << "\n";
   }
   if (argc > 1 && (flag & 2)) {
-    std::cout
-        << "\nSOA<sized_int<1>, sized_int<2>, sized_int<4>, sized_int<8>>\n";
+    std::cout << "\nSOA<sized_uint<1>, sized_uint<2>, sized_uint<4>, "
+                 "sized_uint<8>>\n";
     uint64_t number_of_elements = std::strtol(argv[1], nullptr, 10);
-    auto tup = SOA<sized_int<1>, sized_int<2>, sized_int<4>, sized_int<8>>(
+    auto tup = SOA<sized_uint<1>, sized_uint<2>, sized_uint<4>, sized_uint<8>>(
         number_of_elements);
     std::cout << "size = " << tup.get_size() << "\n";
     // std::random_device rd;
@@ -352,10 +337,10 @@ int main(int32_t argc, char *argv[]) {
   }
 
   if (argc > 1 && (flag & 8)) {
-    std::cout
-        << "\nSOA<sized_int<3>, sized_int<5>, sized_int<6>, sized_int<7>>\n";
+    std::cout << "\nSOA<sized_uint<3>, sized_uint<5>, sized_uint<6>, "
+                 "sized_uint<7>>\n";
     uint64_t number_of_elements = std::strtol(argv[1], nullptr, 10);
-    auto tup = SOA<sized_int<3>, sized_int<5>, sized_int<6>, sized_int<7>>(
+    auto tup = SOA<sized_uint<3>, sized_uint<5>, sized_uint<6>, sized_uint<7>>(
         number_of_elements);
     std::cout << "size = " << tup.get_size() << "\n";
     // std::random_device rd;
