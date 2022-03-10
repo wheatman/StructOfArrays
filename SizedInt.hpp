@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <ostream>
+#include <string>
 #include <type_traits>
 
 template <size_t I> class __attribute__((__packed__)) sized_uint {
@@ -40,4 +41,7 @@ public:
   }
   constexpr sized_uint() { data.fill(0); }
   operator auto() const { return get(); }
+  static std::string name() {
+    return std::string("sized_uint<") + std::to_string(I) + ">";
+  }
 };
