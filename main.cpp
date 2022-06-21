@@ -2,6 +2,7 @@
 #include "aos.hpp"
 #include "soa.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -50,6 +51,15 @@ int main(int32_t argc, char *argv[]) {
     tup.print_soa();
     tup.print_aos<0, 1, 2, 3>();
     tup.print_aos_with_index<0, 1, 2, 3>();
+    std::cout << "\nbefore sort\n";
+    tup.print_aos<0, 1, 2, 3>();
+    std::cout << "\nsorted\n";
+    // std::sort(tup.begin(), tup.end(), [](auto lhs, auto rhs) {
+    //   return std::get<0>(decltype(tup)::T(lhs)) <
+    //          std::get<0>(decltype(tup)::T(rhs));
+    // });
+    std::sort(tup.begin(), tup.end());
+    tup.print_aos<0, 1, 2, 3>();
     std::cout << "\n";
 
     size_t sum_all = 0;

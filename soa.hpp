@@ -4,13 +4,17 @@
 #include <cstddef>
 #include <cstring>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
 
 template <typename... Ts> class SOA {
+public:
   using T = std::tuple<Ts...>;
+
+private:
   static constexpr std::size_t num_types = sizeof...(Ts);
   static constexpr std::array<std::size_t, num_types> alignments = {
       std::alignment_of_v<Ts>...};
@@ -267,4 +271,140 @@ public:
                             num_spots);
     return soa;
   }
+
+  class Iterator {
+
+  public:
+    using difference_type = uint64_t;
+    using value_type = T;
+    using iterator_category = std::random_access_iterator_tag;
+
+    struct reference {
+      void const *_array;
+      size_t _spots;
+      uint64_t _index;
+
+      reference &operator=(reference &&v) {
+        get_static(_array, _spots, _index) =
+            get_static(v._array, v._spots, v._index);
+        return *this;
+      }
+      reference &operator=(const value_type &v) {
+        get_static(_array, _spots, _index) = v;
+        return *this;
+      }
+
+      operator value_type() const { return get_static(_array, _spots, _index); }
+
+      template <size_t... Is> auto get() {
+        return get_static<Is...>(_array, _spots, _index);
+      }
+
+      friend void swap(const reference &l, const reference &r) {
+        T temp = get_static(l._array, l._spots, l._index);
+        get_static(l._array, l._spots, l._index) =
+            get_static(r._array, r._spots, r._index);
+        get_static(r._array, r._spots, r._index) = temp;
+      }
+
+      auto operator<(const reference &b) const {
+        return value_type() < value_type(b);
+      }
+      auto operator<(const T &b) const { return value_type() < b; }
+      friend auto operator<(const T &b, const reference &a) {
+        return b < value_type(a);
+      }
+
+      reference(void const *array, uint64_t spots, uint64_t index)
+          : _array(array), _spots(spots), _index(index) {}
+    };
+
+    Iterator(void const *array, uint64_t spots, uint64_t index)
+        : _array(array), _spots(spots), _index(index) {}
+
+    inline Iterator &operator+=(difference_type rhs) {
+      _index += rhs;
+      return *this;
+    }
+    inline Iterator &operator-=(difference_type rhs) {
+      _index -= rhs;
+      return *this;
+    }
+
+    inline reference operator*() const {
+      return reference(_array, _spots, _index);
+    }
+    inline reference operator[](difference_type rhs) const {
+      return reference(_array, _spots, _index + rhs);
+    }
+
+    inline Iterator &operator++() {
+      ++_index;
+      return *this;
+    }
+    inline Iterator &operator--() {
+      --_index;
+      return *this;
+    }
+    inline Iterator operator++(int) {
+      Iterator tmp(*this);
+      ++_index;
+      return tmp;
+    }
+    inline Iterator operator--(int) {
+      Iterator tmp(*this);
+      --_index;
+      return tmp;
+    }
+
+    inline difference_type operator-(const Iterator &rhs) const {
+      return _index - rhs._index;
+    }
+    inline Iterator operator+(difference_type rhs) const {
+      return Iterator(_array, _spots, _index + rhs);
+    }
+    inline Iterator operator-(difference_type rhs) const {
+      return Iterator(_array, _spots, _index - rhs);
+    }
+    friend inline Iterator operator+(difference_type lhs, const Iterator &rhs) {
+      return Iterator(rhs._array, rhs._spots, lhs + rhs._index);
+    }
+    friend inline Iterator operator-(difference_type lhs, const Iterator &rhs) {
+      return Iterator(rhs._array, rhs._spots, lhs - rhs._index);
+    }
+
+    inline bool operator==(const Iterator &rhs) const {
+      return _index == rhs._index;
+    }
+    inline bool operator!=(const Iterator &rhs) const {
+      return _index != rhs._index;
+    }
+    inline bool operator>(const Iterator &rhs) const {
+      return _index > rhs._index;
+    }
+    inline bool operator<(const Iterator &rhs) const {
+      return _index < rhs._index;
+    }
+    inline bool operator>=(const Iterator &rhs) const {
+      return _index >= rhs._index;
+    }
+    inline bool operator<=(const Iterator &rhs) const {
+      return _index <= rhs._index;
+    }
+
+  private:
+    void const *_array;
+    size_t _spots;
+    uint64_t _index = 0;
+  };
+
+  static Iterator begin_static(void const *base_array, size_t num_spots) {
+    return Iterator(base_array, num_spots, 0);
+  }
+  auto begin() const { return begin_static(base_array, num_spots); }
+
+  static Iterator end_static(void const *base_array, size_t num_spots) {
+    return Iterator(base_array, num_spots, num_spots);
+  }
+  auto end() const { return end_static(base_array, num_spots); }
 };
