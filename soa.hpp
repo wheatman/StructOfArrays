@@ -1,5 +1,6 @@
 #pragma once
 
+#include "multipointer.hpp"
 #include <array>
 #include <cstddef>
 #include <cstring>
@@ -101,6 +102,14 @@ private:
   }
 
   template <size_t... Is>
+  static MultiPointer<NthType<Is>...> get_ptr_impl_static(
+      void const *base_array, size_t num_spots, size_t i,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    return MultiPointer((
+        get_starting_pointer_to_type_static<Is>(base_array, num_spots) + i)...);
+  }
+
+  template <size_t... Is>
   auto get_impl(
       size_t i,
       [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) const {
@@ -123,6 +132,8 @@ public:
     return length_to_allocate;
   }
   size_t get_size() const { return get_size_static(num_spots); }
+
+  size_t size() const { return num_spots; }
 
   SOA(size_t n) : num_spots(n) {
     // set the total array to be 64 byte alignmed
@@ -150,8 +161,28 @@ public:
     }
   }
 
+  template <size_t... Is>
+  static auto get_static_ptr(void const *base_array, size_t num_spots,
+                             size_t i) {
+    if constexpr (sizeof...(Is) > 0) {
+      if constexpr (sizeof...(Is) == 1) {
+        return get_ptr_impl_static<Is...>(base_array, num_spots, i, {})
+            .get_pointer();
+      } else {
+        return get_ptr_impl_static<Is...>(base_array, num_spots, i, {});
+      }
+    } else {
+      return get_ptr_impl_static(base_array, num_spots, i,
+                                 std::make_index_sequence<num_types>{});
+    }
+  }
+
   template <size_t... Is> auto get(size_t i) const {
     return get_static<Is...>(base_array, num_spots, i);
+  }
+
+  template <size_t... Is> auto get_ptr(size_t i) const {
+    return get_static_ptr<Is...>(base_array, num_spots, i);
   }
 
   static void print_type_details() {
