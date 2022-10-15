@@ -137,14 +137,14 @@ public:
   reference_type operator*() { return operator[](0); }
   std::tuple<const Ts &...> operator*() const { return operator[](0); }
 
-  MultiPointer operator+(int i) {
+  MultiPointer operator+(uint64_t i) {
 
     pointer_type new_pointers =
         transform(pointers, [i](auto *data) { return data + i; });
     return std::make_from_tuple<MultiPointer>(new_pointers);
   }
 
-  MultiPointer operator-(int i) const {
+  MultiPointer operator-(uint64_t i) const {
 
     pointer_type new_pointers =
         transform(pointers, [i](auto *data) { return data - i; });
