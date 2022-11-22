@@ -119,7 +119,6 @@ public:
     }
   }
 
-
   template <size_t... Is, class F>
   static void
   map_range_with_index_static(void *base_array, size_t num_spots, F f,
