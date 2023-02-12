@@ -27,6 +27,8 @@ private:
   size_t num_spots;
   void *base_array;
 
+  // TODO(wheatman) properly have const and non const versions of this and
+  // propogate them up
   template <size_t I>
   static NthType<I> *get_starting_pointer_to_type_static(void const *base_array,
                                                          size_t num_spots) {
