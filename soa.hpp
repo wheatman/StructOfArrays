@@ -30,7 +30,7 @@ private:
   // TODO(wheatman) properly have const and non const versions of this and
   // propogate them up
   template <size_t I>
-  static NthType<I> *get_starting_pointer_to_type_static(void const *base_array,
+  static NthType<I> *get_starting_pointer_to_type_static(void *base_array,
                                                          size_t num_spots) {
     static_assert(I < num_types);
     uintptr_t offset = 0;
@@ -99,7 +99,7 @@ private:
 
   template <size_t... Is>
   static auto get_impl_static(
-      void const *base_array, size_t num_spots, size_t i,
+      void *base_array, size_t num_spots, size_t i,
       [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
     return std::forward_as_tuple(
         get_starting_pointer_to_type_static<Is>(base_array, num_spots)[i]...);
@@ -107,7 +107,7 @@ private:
 
   template <size_t... Is>
   static MultiPointer<NthType<Is>...> get_ptr_impl_static(
-      void const *base_array, size_t num_spots, size_t i,
+      void *base_array, size_t num_spots, size_t i,
       [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
     return MultiPointer((
         get_starting_pointer_to_type_static<Is>(base_array, num_spots) + i)...);
@@ -156,7 +156,7 @@ public:
   void zero() const { zero_static(base_array, num_spots); }
 
   template <size_t... Is>
-  static auto get_static(void const *base_array, size_t num_spots, size_t i) {
+  static auto get_static(void *base_array, size_t num_spots, size_t i) {
     if constexpr (sizeof...(Is) > 0) {
       return get_impl_static<Is...>(base_array, num_spots, i, {});
     } else {
@@ -166,8 +166,7 @@ public:
   }
 
   template <size_t... Is>
-  static auto get_static_ptr(void const *base_array, size_t num_spots,
-                             size_t i) {
+  static auto get_static_ptr(void *base_array, size_t num_spots, size_t i) {
     if constexpr (sizeof...(Is) > 0) {
       if constexpr (sizeof...(Is) == 1) {
         return get_ptr_impl_static<Is...>(base_array, num_spots, i, {})
@@ -218,8 +217,7 @@ public:
 
   template <size_t... Is, class F>
   static void
-  map_range_static(void const *base_array, size_t num_spots, F f,
-                   size_t start = 0,
+  map_range_static(void *base_array, size_t num_spots, F f, size_t start = 0,
                    size_t end = std::numeric_limits<size_t>::max()) {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
@@ -316,7 +314,7 @@ public:
     using iterator_category = std::random_access_iterator_tag;
 
     struct reference {
-      void const *_array;
+      void *_array;
       size_t _spots;
       uint64_t _index;
 
@@ -351,11 +349,11 @@ public:
         return b < value_type(a);
       }
 
-      reference(void const *array, uint64_t spots, uint64_t index)
+      reference(void *array, uint64_t spots, uint64_t index)
           : _array(array), _spots(spots), _index(index) {}
     };
 
-    Iterator(void const *array, uint64_t spots, uint64_t index)
+    Iterator(void *array, uint64_t spots, uint64_t index)
         : _array(array), _spots(spots), _index(index) {}
 
     inline Iterator &operator+=(difference_type rhs) {
@@ -429,17 +427,17 @@ public:
     }
 
   private:
-    void const *_array;
+    void *_array;
     size_t _spots;
     uint64_t _index = 0;
   };
 
-  static Iterator begin_static(void const *base_array, size_t num_spots) {
+  static Iterator begin_static(void *base_array, size_t num_spots) {
     return Iterator(base_array, num_spots, 0);
   }
   auto begin() const { return begin_static(base_array, num_spots); }
 
-  static Iterator end_static(void const *base_array, size_t num_spots) {
+  static Iterator end_static(void *base_array, size_t num_spots) {
     return Iterator(base_array, num_spots, num_spots);
   }
   auto end() const { return end_static(base_array, num_spots); }
