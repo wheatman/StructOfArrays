@@ -34,10 +34,12 @@ private:
                                                          size_t num_spots) {
     static_assert(I < num_types);
     uintptr_t offset = 0;
-    for (size_t i = 0; i < I; i++) {
-      offset += num_spots * sizes[i];
-      if (offset % alignments[i + 1] != 0) {
-        offset += alignments[i + 1] - (offset % alignments[i + 1]);
+    if constexpr (I > 0) {
+      for (size_t i = 0; i < I; i++) {
+        offset += num_spots * sizes[i];
+        if (offset % alignments[i + 1] != 0) {
+          offset += alignments[i + 1] - (offset % alignments[i + 1]);
+        }
       }
     }
     return (NthType<I> *)((char *)base_array + offset);
