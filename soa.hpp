@@ -135,9 +135,9 @@ public:
     }
     return length_to_allocate;
   }
-  size_t get_size() const { return get_size_static(num_spots); }
+  [[nodiscard]] size_t get_size() const { return get_size_static(num_spots); }
 
-  size_t size() const { return num_spots; }
+  [[nodiscard]] size_t size() const { return num_spots; }
 
   SOA(size_t n) : num_spots(n) {
     // set the total array to be 64 byte alignmed
