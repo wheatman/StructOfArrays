@@ -9,10 +9,7 @@ SANITIZE?=0
 GDB?=0
 
 
-
-TAPIR_DIR=../OpenCilk-9.0.1-Linux/
-
-CFLAGS := -Wall -Wextra -O$(OPT) -g  -std=c++20
+CFLAGS := -Wall -Wextra -O$(OPT) -g  -std=c++20 -Iinclude/
 
 ifeq ($(SANITIZE),1)
 ifeq ($(CILK),1)
@@ -52,11 +49,10 @@ endif
 
 all: basic
  
-basic: main.cpp soa.hpp aos.hpp SizedInt.hpp
+basic: main.cpp include/StructOfArrays/soa.hpp include/StructOfArrays/aos.hpp include/StructOfArrays/internal/SizedInt.hpp
 	$(CXX) $(CFLAGS) $(DEFINES) $(LDFLAGS) -o $@ main.cpp
 
 
 
 clean:
 	rm -f *.o opt profile basic code.profdata default.profraw cachegrind.out.* perf.data perf.data.old
-

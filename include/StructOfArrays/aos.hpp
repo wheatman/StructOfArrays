@@ -10,6 +10,7 @@
 template <typename... Ts> class AOS {
 public:
   using T = std::tuple<Ts...>;
+
 private:
   static constexpr std::size_t num_types = sizeof...(Ts);
   static constexpr size_t element_size = sizeof(T);
@@ -24,14 +25,16 @@ private:
   T *base_array;
 
   template <size_t... Is>
-  static auto get_impl_static(T *base_array, size_t i,
-                [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+  static auto get_impl_static(
+      T *base_array, size_t i,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
     return std::forward_as_tuple(std::get<Is>(base_array[i])...);
   }
 
   template <size_t... Is>
-  static auto get_impl_static(T const *base_array, size_t i,
-                [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+  static auto get_impl_static(
+      T const *base_array, size_t i,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
     return std::forward_as_tuple(std::get<Is>(base_array[i])...);
   }
   template <size_t... Is>
@@ -57,7 +60,8 @@ public:
   void zero() { std::memset(base_array, 0, get_size()); }
 
   template <size_t... Is>
-  static auto get_static(void const * base_array, size_t num_spots, size_t i) {
+  static auto get_static(void const *base_array,
+                         [[maybe_unused]] size_t num_spots, size_t i) {
     if constexpr (sizeof...(Is) > 0) {
       return get_impl_static<Is...>((T const *)base_array, i, {});
     } else {
@@ -66,7 +70,8 @@ public:
     }
   }
   template <size_t... Is>
-  static auto get_static(void* base_array, size_t num_spots, size_t i) {
+  static auto get_static(void *base_array, [[maybe_unused]] size_t num_spots,
+                         size_t i) {
     if constexpr (sizeof...(Is) > 0) {
       return get_impl_static<Is...>((T *)base_array, i, {});
     } else {
@@ -128,15 +133,17 @@ public:
       end = num_spots;
     }
     for (size_t i = start; i < end; i++) {
-      std::apply(f, std::tuple_cat(std::make_tuple(i), get_static<Is...>(base_array, num_spots, i)));
+      std::apply(f,
+                 std::tuple_cat(std::make_tuple(i),
+                                get_static<Is...>(base_array, num_spots, i)));
     }
   }
 
   template <size_t... Is, class F>
   static void
   map_range_static(void const *base_array, size_t num_spots, F f,
-                              size_t start = 0,
-                              size_t end = std::numeric_limits<size_t>::max()) {
+                   size_t start = 0,
+                   size_t end = std::numeric_limits<size_t>::max()) {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
     }
@@ -147,9 +154,8 @@ public:
 
   template <size_t... Is, class F>
   static void
-  map_range_static(void *base_array, size_t num_spots, F f,
-                              size_t start = 0,
-                              size_t end = std::numeric_limits<size_t>::max()) {
+  map_range_static(void *base_array, size_t num_spots, F f, size_t start = 0,
+                   size_t end = std::numeric_limits<size_t>::max()) {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
     }
@@ -157,17 +163,17 @@ public:
       std::apply(f, get_static<Is...>(base_array, num_spots, i));
     }
   }
-  
+
   class Iterator {
 
   public:
     using difference_type = uint64_t;
     using value_type = T;
     using iterator_category = std::random_access_iterator_tag;
-    using reference = T&;
+    using reference = T &;
 
     Iterator(void *array, uint64_t spots, uint64_t index)
-        : _array((T*)array), _spots(spots), _index(index) {}
+        : _array((T *)array), _spots(spots), _index(index) {}
 
     inline Iterator &operator+=(difference_type rhs) {
       _index += rhs;
@@ -178,9 +184,7 @@ public:
       return *this;
     }
 
-    inline reference operator*() {
-      return _array[_index];
-    }
+    inline reference operator*() { return _array[_index]; }
     inline reference operator[](difference_type rhs) {
       return _array[_index + rhs];
     }
@@ -219,7 +223,7 @@ public:
     friend inline Iterator operator-(difference_type lhs, const Iterator &rhs) {
       return Iterator(rhs._array, rhs._spots, lhs - rhs._index);
     }
-        inline bool operator==(const Iterator &rhs) const {
+    inline bool operator==(const Iterator &rhs) const {
       return _index == rhs._index;
     }
     inline bool operator!=(const Iterator &rhs) const {
@@ -239,7 +243,7 @@ public:
     }
 
   private:
-    T* _array;
+    T *_array;
     size_t _spots;
     uint64_t _index = 0;
   };

@@ -1,6 +1,6 @@
-#include "SizedInt.hpp"
-#include "aos.hpp"
-#include "soa.hpp"
+#include "StructOfArrays/aos.hpp"
+#include "StructOfArrays/internal/SizedInt.hpp"
+#include "StructOfArrays/soa.hpp"
 
 #include <algorithm>
 #include <cstdint>
