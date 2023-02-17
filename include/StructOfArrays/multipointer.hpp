@@ -194,4 +194,8 @@ public:
     l = r;
     r = temp;
   }
+
+  void zero() {
+    apply(pointers, [](auto *p) { std::memset(p, 0, sizeof(*p)); });
+  }
 };
