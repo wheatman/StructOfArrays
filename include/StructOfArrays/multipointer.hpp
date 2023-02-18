@@ -91,9 +91,21 @@ private:
                       tuple);
   }
 
+  template <std::size_t... I>
+  static std::tuple<Ts *...> MakeTuplePtr(std::tuple<Ts &...> &tuple,
+                                          std::index_sequence<I...>) {
+    return std::make_tuple(&std::get<I>(tuple)...);
+  }
+
+  static std::tuple<Ts *...> MakeTuplePtr(std::tuple<Ts &...> &tuple) {
+    return MakeTuplePtr(tuple, std::make_index_sequence<sizeof...(Ts)>{});
+  }
+
 public:
   MultiPointer(Ts *...ps) : pointers(std::make_tuple(ps...)) {}
   MultiPointer(pointer_type ps) : pointers(ps) {}
+
+  MultiPointer(std::tuple<Ts &...> ts) : pointers(MakeTuplePtr(ts)) {}
 
   template <size_t I = 0> auto get_pointer() { return std::get<I>(pointers); }
   template <size_t I = 0> auto get_pointer() const {
