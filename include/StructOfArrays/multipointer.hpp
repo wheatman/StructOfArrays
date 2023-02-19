@@ -8,6 +8,7 @@
 #include <limits>
 #include <sys/ucontext.h>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -99,6 +100,37 @@ private:
 
   static std::tuple<Ts *...> MakeTuplePtr(std::tuple<Ts &...> &tuple) {
     return MakeTuplePtr(tuple, std::make_index_sequence<sizeof...(Ts)>{});
+  }
+
+  template <std::size_t... I>
+  static std::tuple<Ts &...> MakeTupleRef(std::tuple<Ts...> &tuple,
+                                          std::index_sequence<I...>) {
+    return std::forward_as_tuple(std::get<I>(tuple)...);
+  }
+
+  static std::tuple<Ts &...> MakeTupleRef(std::tuple<Ts...> &tuple) {
+    return MakeTupleRef(tuple, std::make_index_sequence<sizeof...(Ts)>{});
+  }
+
+  template <typename... T>
+  static void set_and_zero_impl(std::tuple<T *...> location,
+                                std::tuple<T &...> data) {
+    std::memcpy(std::get<0>(location), &std::get<0>(data),
+                sizeof(std::get<0>(data)));
+    std::memset(&std::get<0>(data), 0, sizeof(std::get<0>(data)));
+    if constexpr (sizeof...(T) > 1) {
+      set_and_zero_impl(leftshift_tuple(location), leftshift_tuple(data));
+    }
+  }
+
+  template <typename... T>
+  static void set_impl(std::tuple<T *...> location,
+                       std::tuple<const T &...> data) {
+    std::memcpy(std::get<0>(location), &std::get<0>(data),
+                sizeof(std::get<0>(data)));
+    if constexpr (sizeof...(T) > 1) {
+      set_impl(leftshift_tuple(location), leftshift_tuple(data));
+    }
   }
 
 public:
@@ -209,5 +241,12 @@ public:
 
   void zero() {
     apply(pointers, [](auto *p) { std::memset(p, 0, sizeof(*p)); });
+  }
+
+  void set_and_zero(std::tuple<Ts &...> ts) { set_and_zero_impl(pointers, ts); }
+  void set_and_zero(std::tuple<Ts...> &ts) { set_and_zero(MakeTupleRef(ts)); }
+  void set(std::tuple<const Ts &...> ts) { set_impl(pointers, ts); }
+  void deconstruct() {
+    apply(pointers, [](auto *p) { std::destroy_at(p); });
   }
 };
