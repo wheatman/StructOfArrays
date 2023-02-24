@@ -45,6 +45,23 @@ private:
     return (NthType<I> *)((char *)base_array + offset);
   }
 
+  template <size_t I>
+  static const NthType<I> *
+  get_starting_pointer_to_type_static(const void *base_array,
+                                      size_t num_spots) {
+    static_assert(I < num_types);
+    uintptr_t offset = 0;
+    if constexpr (I > 0) {
+      for (size_t i = 0; i < I; i++) {
+        offset += num_spots * sizes[i];
+        if (offset % alignments[i + 1] != 0) {
+          offset += alignments[i + 1] - (offset % alignments[i + 1]);
+        }
+      }
+    }
+    return (const NthType<I> *)((const char *)base_array + offset);
+  }
+
   template <size_t I> NthType<I> *get_starting_pointer_to_type() const {
     return get_starting_pointer_to_type_static<I>(base_array, num_spots);
   }
@@ -106,6 +123,14 @@ private:
   }
 
   template <size_t... Is>
+  static auto get_impl_static(
+      const void *base_array, size_t num_spots, size_t i,
+      [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
+    return std::forward_as_tuple(
+        get_starting_pointer_to_type_static<Is>(base_array, num_spots)[i]...);
+  }
+
+  template <size_t... Is>
   static MultiPointer<NthType<Is>...> get_ptr_impl_static(
       void *base_array, size_t num_spots, size_t i,
       [[maybe_unused]] std::integer_sequence<size_t, Is...> int_seq) {
@@ -157,6 +182,16 @@ public:
 
   template <size_t... Is>
   static auto get_static(void *base_array, size_t num_spots, size_t i) {
+    if constexpr (sizeof...(Is) > 0) {
+      return get_impl_static<Is...>(base_array, num_spots, i, {});
+    } else {
+      return get_impl_static(base_array, num_spots, i,
+                             std::make_index_sequence<num_types>{});
+    }
+  }
+
+  template <size_t... Is>
+  static auto get_static(const void *base_array, size_t num_spots, size_t i) {
     if constexpr (sizeof...(Is) > 0) {
       return get_impl_static<Is...>(base_array, num_spots, i, {});
     } else {
