@@ -252,7 +252,7 @@ public:
 
   template <size_t... Is, class F>
   static void
-  map_range_static(void *base_array, size_t num_spots, F f, size_t start = 0,
+  map_range_static(void *base_array, size_t num_spots, F &&f, size_t start = 0,
                    size_t end = std::numeric_limits<size_t>::max()) {
     if (end == std::numeric_limits<size_t>::max()) {
       end = num_spots;
@@ -263,14 +263,14 @@ public:
   }
 
   template <size_t... Is, class F>
-  void map_range(F f, size_t start = 0,
+  void map_range(F &&f, size_t start = 0,
                  size_t end = std::numeric_limits<size_t>::max()) const {
     map_range_static<Is...>(base_array, num_spots, f, start, end);
   }
 
   template <size_t... Is, class F>
   static void
-  map_range_with_index_static(void *base_array, size_t num_spots, F f,
+  map_range_with_index_static(void *base_array, size_t num_spots, F &&f,
                               size_t start = 0,
                               size_t end = std::numeric_limits<size_t>::max()) {
     if (end == std::numeric_limits<size_t>::max()) {
@@ -285,7 +285,7 @@ public:
 
   template <size_t... Is, class F>
   void
-  map_range_with_index(F f, size_t start = 0,
+  map_range_with_index(F &&f, size_t start = 0,
                        size_t end = std::numeric_limits<size_t>::max()) const {
     map_range_with_index_static<Is...>(base_array, num_spots, f, start, end);
   }
