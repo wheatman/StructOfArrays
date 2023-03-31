@@ -180,6 +180,11 @@ public:
   }
   void zero() const { zero_static(base_array, num_spots); }
 
+  static NthType<0> get_element_static(const void *base_array, size_t num_spots,
+                                       size_t i) {
+    return get_starting_pointer_to_type_static<0>(base_array, num_spots)[i];
+  }
+
   template <size_t... Is>
   static auto get_static(void *base_array, size_t num_spots, size_t i) {
     if constexpr (sizeof...(Is) > 0) {
